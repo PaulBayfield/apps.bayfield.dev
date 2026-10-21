@@ -1,0 +1,19 @@
+{
+  "apps": [
+    {
+      "id": "website",
+      "name": "bayfield.dev",
+      "url": "https://bayfield.dev",
+      "description": "My website: projects, posts and how to reach me.",
+      "category": "Websites",
+      "icon": "https://bayfield.dev/favicon.svg"
+    },
+    {
+      "id": "concerts",
+      "name": "Concerts",
+      "url": "https://concerts.bayfield.dev",
+      "description": "The concerts I've been to and the ones coming up.",
+      "category": "Websites"
+    }
+  ]
+}

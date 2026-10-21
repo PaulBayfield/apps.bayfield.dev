@@ -1,0 +1,23 @@
+{
+  "name": "apps-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Apps API: the public apps, the Authentik apps each user may open, sign-in, and the static host for the web build",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.ts",
+    "dev": "node --watch --env-file-if-exists=.env src/index.ts",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "~7.0.2"
+  }
+}

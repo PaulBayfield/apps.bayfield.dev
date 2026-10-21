@@ -1,0 +1,11 @@
+services:
+  apps:
+    image: ghcr.io/paulbayfield/apps.bayfield.dev:latest
+    build: .
+    env_file: server/.env
+    ports:
+      - "8791:8791"
+    volumes:
+      # The public apps: edit config/apps.json, no restart needed.
+      - ./config:/app/config:ro
+    restart: unless-stopped
