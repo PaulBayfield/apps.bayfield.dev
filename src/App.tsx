@@ -81,7 +81,17 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
   const sidebarVisible = mobile ? drawer : settings.sidebar;
   const panelVisible = mobile ? mobilePanel : settings.panel;
   const toggleSidebar = () => (mobile ? setDrawer((d) => !d) : update({ sidebar: !settings.sidebar }));
-  const togglePanel = () => (mobile ? setMobilePanel((p) => !p) : update({ panel: !settings.panel }));
+  // Closing the panel also deselects the app it was showing.
+  const closePanel = () => {
+    if (mobile) setMobilePanel(false);
+    else update({ panel: false });
+    if (router.query.app) router.setQuery({ app: undefined }, true);
+  };
+  const togglePanel = () => {
+    if (panelVisible) closePanel();
+    else if (mobile) setMobilePanel(true);
+    else update({ panel: true });
+  };
 
   const targetOf = useCallback(
     (app: AppItem) => (settings.openIn === "new" || (settings.openIn === "app" && app.newTab) ? ("_blank" as const) : undefined),
@@ -203,7 +213,7 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
       else if (k === ".") togglePanel();
       else if (k === "escape" && mobile && (drawer || mobilePanel)) {
         setDrawer(false);
-        setMobilePanel(false);
+        if (mobilePanel) closePanel();
       } else if (k === "escape" && selected) router.setQuery({ app: undefined }, true);
       else if (/^[1-9]$/.test(k) && favoriteApps[Number(k) - 1]) launch(favoriteApps[Number(k) - 1]);
       else return;
@@ -227,7 +237,7 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
         </main>
         {panelVisible && (
           <>
-            {mobile && <div className="sidebar-backdrop" onClick={() => setMobilePanel(false)} />}
+            {mobile && <div className="sidebar-backdrop" onClick={closePanel} />}
             <DetailsPanel />
           </>
         )}
