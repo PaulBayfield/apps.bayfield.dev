@@ -43,7 +43,7 @@ With `DEV_LOGIN_USER` (only honoured on `http://localhost`), sign-in skips Authe
 ## 🔐 • Authentik Setup
 
 1. **Provider:** Applications → Providers → *OAuth2/OpenID*, confidential client, redirect URI `https://apps.bayfield.dev/api/auth/oidc/callback`, scopes `openid profile email`. Put its issuer, client ID and secret in `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`. Bind no policy to this application, so anyone can sign in to the hub.
-2. **API token:** create a service account and give it these permissions (or make it a superuser): *view user*, *view user applications*, *reset user password*, and, for two-factor, *view* and *delete* on *TOTP Device* and *WebAuthn Device* (add *view* on *Static Device* to list recovery codes too). Create an API token for it (Directory → Tokens) and set it as `AUTHENTIK_TOKEN`.
+2. **API token:** create a service account and give it these permissions (or make it a superuser): *view user*, *view user applications*, *reset user password*, *view group* and *view policy binding* (to show which groups give access to each app), and, for two-factor, *view* and *delete* on *TOTP Device* and *WebAuthn Device* (add *view* on *Static Device* to list recovery codes too). Create an API token for it (Directory → Tokens) and set it as `AUTHENTIK_TOKEN`.
 3. **Private apps:** any Authentik application with a launch URL. Its policy bindings decide who sees it; its *group* becomes the category; its icon, description and publisher show on the card and in the details panel.
 
 Notes:

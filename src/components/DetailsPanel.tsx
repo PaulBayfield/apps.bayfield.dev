@@ -3,14 +3,15 @@
 // or the button at the end of the toolbar.
 
 import { useMemo, type ReactNode } from "react";
-import { hostOf, type App } from "../lib/api";
+import { hostOf, type App, type AppAccess } from "../lib/api";
 import { byCategory, useApp } from "../lib/app";
+import { useApi } from "../lib/hooks";
 import { recordOpened, useFavorites, useRecent } from "../lib/local";
 import { useSettings } from "../lib/settings";
 import type { StringKey } from "../lib/i18n";
 import { AppIcon } from "./AppIcon";
 import { CopyButton } from "./common";
-import { Check, ChevronLeft, ExternalLink, Globe, Lock, Star, X } from "./icons";
+import { Check, ChevronLeft, ExternalLink, Globe, Lock, Shield, Star, UserIcon, Users, X } from "./icons";
 
 export function DetailsPanel() {
   const { t } = useSettings();
@@ -85,7 +86,52 @@ function AppDetails({ app }: { app: App }) {
         {app.publisher && <DetailRow label={t("publisher")}>{app.publisher}</DetailRow>}
         {opened && <DetailRow label={t("recent")}>{f.relative(opened.at, t)}</DetailRow>}
       </section>
+      {app.access === "private" && <AccessSection app={app} />}
     </>
+  );
+}
+
+/** Which of the user's groups (or what else) give them access, from the app's bindings in Authentik. */
+function AccessSection({ app }: { app: App }) {
+  const { t } = useSettings();
+  const { data, error } = useApi<AppAccess>(`/apps/access?id=${encodeURIComponent(app.id)}`);
+  const none = data && !data.everyone && !data.user && data.groups.length === 0 && data.policies.length === 0;
+  const ruleCount = data ? data.groups.length + data.policies.length + (data.user ? 1 : 0) : 0;
+
+  return (
+    <section className="panel-section">
+      <div className="panel-subtitle">{t("yourAccess")}</div>
+      {!data ? (
+        error ? <p className="small muted">{t("accessUnavailable")}</p> : <div className="skeleton" style={{ height: 52 }} />
+      ) : (
+        <div className="access-list">
+          {data.everyone && (
+            <AccessItem icon={<Globe size={14} />} label={t("accessEveryone")} />
+          )}
+          {data.groups.map((g) => (
+            <AccessItem key={g.name} icon={<Users size={14} />} label={g.name} hint={g.via ? t("accessVia", { group: g.via }) : t("accessGroup")} />
+          ))}
+          {data.user && <AccessItem icon={<UserIcon size={14} />} label={t("accessDirect")} hint={t("accessDirectHint")} />}
+          {data.policies.map((p) => (
+            <AccessItem key={p} icon={<Shield size={14} />} label={p} hint={t("accessPolicy")} />
+          ))}
+          {none && <p className="small muted">{t("accessUnknown")}</p>}
+          {data.mode === "all" && ruleCount > 1 && <p className="small muted">{t("accessAll")}</p>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AccessItem({ icon, label, hint }: { icon: ReactNode; label: string; hint?: string }) {
+  return (
+    <div className="access-item">
+      <span className="access-icon">{icon}</span>
+      <span className="access-text">
+        <span className="access-label">{label}</span>
+        {hint && <span className="small muted">{hint}</span>}
+      </span>
+    </div>
   );
 }
 

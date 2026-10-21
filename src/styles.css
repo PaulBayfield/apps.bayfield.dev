@@ -2040,3 +2040,38 @@ a.primary-button:hover {
 .settings-nav-item svg {
   flex: none;
 }
+
+/* Details panel: what gives the user access. */
+.access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.access-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.access-icon {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--text-muted);
+  background: var(--bg-input);
+}
+.access-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.access-label {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

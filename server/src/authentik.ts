@@ -17,6 +17,8 @@ export interface AkUser {
   isSuperuser: boolean;
   avatar: string | null;
   groups: string[];
+  /** The same groups, by pk (for matching policy bindings). */
+  groupIds: string[];
   lastLogin: string | null;
   dateJoined: string | null;
   passwordChangeDate: string | null;
@@ -24,9 +26,13 @@ export interface AkUser {
 
 export interface AkApp {
   id: string;
+  /** Authentik's id for the application (policy bindings target it). */
+  pk: string;
   slug: string;
   name: string;
   url: string;
+  /** Policy engine mode: one passing binding is enough ("any") or each must pass ("all"). */
+  mode: "any" | "all";
   description: string;
   publisher: string;
   icon: string | null;
@@ -94,7 +100,7 @@ interface RawUser {
   is_active: boolean;
   is_superuser: boolean;
   avatar?: string;
-  groups_obj?: { name: string }[] | null;
+  groups_obj?: { pk: string; name: string }[] | null;
   last_login?: string | null;
   date_joined?: string | null;
   password_change_date?: string | null;
@@ -110,6 +116,7 @@ const toUser = (u: RawUser): AkUser => ({
   // Authentik's default avatar is an inline SVG data: URL, or a Gravatar link.
   avatar: typeof u.avatar === "string" && /^(https?:|data:image\/)/.test(u.avatar) ? u.avatar : null,
   groups: (u.groups_obj ?? []).map((g) => g.name).sort((a, b) => a.localeCompare(b)),
+  groupIds: (u.groups_obj ?? []).map((g) => String(g.pk)),
   lastLogin: u.last_login ?? null,
   dateJoined: u.date_joined ?? null,
   passwordChangeDate: u.password_change_date ?? null,
@@ -159,6 +166,7 @@ interface RawApp {
   meta_publisher?: string;
   group?: string;
   open_in_new_tab?: boolean;
+  policy_engine_mode?: string;
 }
 
 /** The applications `pk` may open, as Authentik's library shows them (those with a launch URL). */
@@ -177,6 +185,8 @@ export async function appsFor(pk: number, fresh = false): Promise<AkApp[]> {
       if (!url || !/^https?:\/\//.test(url)) continue;
       out.push({
         id: a.slug,
+        pk: String(a.pk),
+        mode: a.policy_engine_mode === "all" ? "all" : "any",
         slug: a.slug,
         name: a.name,
         url,
@@ -293,6 +303,7 @@ function devUser(username: string | undefined): AkUser | null {
     isSuperuser: false,
     avatar: null,
     groups: ["Family", "Developers"],
+    groupIds: ["g-family", "g-developers"],
     lastLogin: new Date().toISOString(),
     dateJoined: "2025-03-14T09:30:00Z",
     passwordChangeDate: "2026-06-01T12:00:00Z",
@@ -305,8 +316,111 @@ const DEV_DEVICES: AkDevice[] = [
 ];
 
 const DEV_APPS: AkApp[] = [
-  { id: "notes", slug: "notes", name: "Notes", url: "https://notes.bayfield.dev", description: "Documents and notes, with live collaboration.", publisher: "Bayfield", icon: null, group: "Productivity", newTab: false },
-  { id: "calendar", slug: "calendar", name: "Calendar", url: "https://calendar.bayfield.dev", description: "Calendars, events and booking pages.", publisher: "Bayfield", icon: null, group: "Productivity", newTab: false },
-  { id: "devtime", slug: "devtime", name: "DevTime", url: "https://dev.bayfield.dev", description: "Coding time from your editors: projects, languages, goals.", publisher: "Bayfield", icon: null, group: "Development", newTab: false },
-  { id: "internal", slug: "internal", name: "Internal", url: "https://internal.bayfield.dev", description: "Internal tools.", publisher: "Bayfield", icon: null, group: "Administration", newTab: true },
+  { id: "notes", pk: "notes", mode: "any", slug: "notes", name: "Notes", url: "https://notes.bayfield.dev", description: "Documents and notes, with live collaboration.", publisher: "Bayfield", icon: null, group: "Productivity", newTab: false },
+  { id: "calendar", pk: "calendar", mode: "any", slug: "calendar", name: "Calendar", url: "https://calendar.bayfield.dev", description: "Calendars, events and booking pages.", publisher: "Bayfield", icon: null, group: "Productivity", newTab: false },
+  { id: "devtime", pk: "devtime", mode: "any", slug: "devtime", name: "DevTime", url: "https://dev.bayfield.dev", description: "Coding time from your editors: projects, languages, goals.", publisher: "Bayfield", icon: null, group: "Development", newTab: false },
+  { id: "internal", pk: "internal", mode: "any", slug: "internal", name: "Internal", url: "https://internal.bayfield.dev", description: "Internal tools.", publisher: "Bayfield", icon: null, group: "Administration", newTab: true },
 ];
+
+// --- Why a user can open an app ---
+
+/**
+ * What gives a user access to an application, from its policy bindings (as Authentik evaluates
+ * them): no bindings means everyone signed in; a group binding counts when the group is one of the
+ * user's groups or an ancestor of one; a user binding when it names them. Policies (expressions,
+ * reputation…) are listed by name: what they decide isn't knowable from here.
+ */
+export interface AppAccess {
+  /** No enabled bindings: anyone who can sign in. */
+  everyone: boolean;
+  /** "any" (one binding is enough) or "all" (each must pass). */
+  mode: "any" | "all";
+  /** The user's groups that are bound; `via`: the user's own group, when the bound one is its ancestor. */
+  groups: { name: string; via: string | null }[];
+  /** A binding names this user. */
+  user: boolean;
+  policies: string[];
+}
+
+interface RawBinding {
+  enabled: boolean;
+  negate: boolean;
+  group?: string | null;
+  user?: number | null;
+  policy?: string | null;
+  policy_obj?: { name: string } | null;
+}
+
+interface RawGroup {
+  pk: string;
+  name: string;
+  parents?: string[];
+  parent?: string | null;
+}
+
+let groupCache: { groups: Map<string, { name: string; parents: string[] }>; until: number } | null = null;
+const bindingCache = new Map<string, { bindings: RawBinding[]; until: number }>();
+
+/** Every group with its parents (a minute's cache). */
+async function allGroups() {
+  if (groupCache && groupCache.until > Date.now()) return groupCache.groups;
+  const groups = new Map<string, { name: string; parents: string[] }>();
+  for (let page = 1; page && page <= 50; ) {
+    const q = new URLSearchParams({ include_users: "false", page_size: "200", page: String(page) });
+    const res = await call<{ pagination: { next: number }; results: RawGroup[] }>(`/core/groups/?${q}`);
+    for (const g of res.results) groups.set(String(g.pk), { name: g.name, parents: (g.parents ?? (g.parent ? [g.parent] : [])).map(String) });
+    page = res.pagination?.next ?? 0;
+  }
+  groupCache = { groups, until: Date.now() + CACHE_MS };
+  return groups;
+}
+
+async function bindingsOf(appPk: string): Promise<RawBinding[]> {
+  const hit = bindingCache.get(appPk);
+  if (hit && hit.until > Date.now()) return hit.bindings;
+  const q = new URLSearchParams({ target: appPk, enabled: "true", page_size: "200" });
+  const res = await call<{ results: RawBinding[] }>(`/policies/bindings/?${q}`);
+  bindingCache.set(appPk, { bindings: res.results, until: Date.now() + CACHE_MS });
+  return res.results;
+}
+
+/** Why `user` can open the app `slug`, or null if they can't (or it doesn't exist). */
+export async function appAccess(user: AkUser, slug: string): Promise<AppAccess | null> {
+  const app = (await appsFor(user.pk)).find((a) => a.slug === slug);
+  if (!app) return null;
+  if (!authentik) return DEV_ACCESS[slug] ?? { everyone: true, mode: "any", groups: [], user: false, policies: [] };
+
+  const [raw, groups] = await Promise.all([bindingsOf(app.pk), allGroups()]);
+  const bindings = raw.filter((b) => b.enabled !== false && !b.negate);
+
+  // Each group the user is in, directly or through a child group: the user's own group it comes through.
+  const reach = new Map<string, string | null>();
+  const walk = (pk: string, via: string | null) => {
+    if (reach.has(pk)) return;
+    reach.set(pk, via);
+    for (const parent of groups.get(pk)?.parents ?? []) walk(parent, via ?? groups.get(pk)?.name ?? null);
+  };
+  for (const pk of user.groupIds) walk(pk, null);
+
+  const seen = new Set<string>();
+  const granted: AppAccess["groups"] = [];
+  for (const b of bindings) {
+    if (!b.group || !reach.has(String(b.group)) || seen.has(String(b.group))) continue;
+    seen.add(String(b.group));
+    granted.push({ name: groups.get(String(b.group))?.name ?? "?", via: reach.get(String(b.group)) ?? null });
+  }
+  return {
+    everyone: raw.filter((b) => b.enabled !== false).length === 0,
+    mode: app.mode,
+    groups: granted.sort((a, b) => a.name.localeCompare(b.name)),
+    user: bindings.some((b) => b.user === user.pk),
+    policies: [...new Set(bindings.filter((b) => b.policy).map((b) => b.policy_obj?.name ?? "?"))],
+  };
+}
+
+const DEV_ACCESS: Record<string, AppAccess> = {
+  notes: { everyone: false, mode: "any", groups: [{ name: "Family", via: null }], user: false, policies: [] },
+  calendar: { everyone: false, mode: "any", groups: [{ name: "Family", via: null }, { name: "Members", via: "Developers" }], user: false, policies: [] },
+  devtime: { everyone: false, mode: "any", groups: [{ name: "Developers", via: null }], user: true, policies: [] },
+  internal: { everyone: false, mode: "any", groups: [], user: false, policies: ["Office network only"] },
+};

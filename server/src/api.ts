@@ -3,7 +3,7 @@
 import { Hono } from "hono";
 import { APP_VERSION, DEV_LOGIN_USER, PASSWORD_MIN_LENGTH, UPDATE_CHECK, authentik, oidc } from "./config.ts";
 import { authorizeUrl, recentUntil, requireUser, type AppEnv } from "./auth.ts";
-import { deleteDevice, devAddDevice, devicesFor, forget, setPassword } from "./authentik.ts";
+import { appAccess, deleteDevice, devAddDevice, devicesFor, forget, setPassword } from "./authentik.ts";
 import { catalog } from "./catalog.ts";
 import { HttpError, bad, body, rateLimit } from "./http.ts";
 import { RELEASES_URL, updateStatus } from "./updates.ts";
@@ -16,6 +16,15 @@ api.get("/apps", async (c) => {
   const fresh = c.req.query("refresh") === "1";
   if (fresh) rateLimit(c, "apps-refresh", 20, 60_000);
   return c.json({ apps: await catalog(user?.pk ?? null, fresh), signedIn: !!user });
+});
+
+/** Why the signed-in user can open a private app (`?id=authentik:<slug>`): the groups, user or policies bound to it. */
+api.get("/apps/access", requireUser, async (c) => {
+  const id = c.req.query("id") ?? "";
+  if (!id.startsWith("authentik:")) throw bad();
+  const access = await appAccess(c.get("user")!, id.slice("authentik:".length));
+  if (!access) throw new HttpError(404, "Not found");
+  return c.json(access);
 });
 
 api.get("/server", (c) =>

@@ -112,3 +112,17 @@ export interface MfaStatus {
   /** At least one authenticator app or passkey. */
   enabled: boolean;
 }
+
+/** GET /apps/access: why the user can open a private app (its policy bindings in Authentik). */
+export interface AppAccess {
+  /** No bindings: anyone who can sign in. */
+  everyone: boolean;
+  /** "all": each binding must pass. */
+  mode: "any" | "all";
+  /** The bound groups the user is in; `via`: their own group, when the bound one is its parent. */
+  groups: { name: string; via: string | null }[];
+  /** A binding names the user directly. */
+  user: boolean;
+  /** Policies bound to the app (what they decide isn't known here). */
+  policies: string[];
+}
