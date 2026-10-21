@@ -2,7 +2,7 @@
 // in, the Authentik applications that user may open.
 
 import { readFile, stat } from "node:fs/promises";
-import { APPS_FILE } from "./config.ts";
+import { APPS_FILE, PUBLIC_URL } from "./config.ts";
 import { appsFor, type AkApp } from "./authentik.ts";
 
 export interface App {
@@ -96,8 +96,19 @@ const sameUrl = (a: string, b: string) => a.replace(/\/+$/, "").toLowerCase() ==
 
 /** Everything `pk` can open (public first if both list the same URL), sorted by name. */
 export async function catalog(pk: number | null, fresh = false): Promise<App[]> {
-  const pub = await publicApps();
+  const pub = (await publicApps()).filter((a) => !isHub(a.url));
   if (pk === null) return pub;
-  const priv = (await appsFor(pk, fresh)).map(fromAuthentik).filter((p) => !pub.some((a) => sameUrl(a.url, p.url)));
+  const priv = (await appsFor(pk, fresh))
+    .map(fromAuthentik)
+    .filter((p) => !isHub(p.url) && !pub.some((a) => sameUrl(a.url, p.url)));
   return [...pub, ...priv].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+/** This hub itself (its own Authentik application, say): not worth listing inside it. */
+function isHub(url: string): boolean {
+  try {
+    return new URL(url).origin === new URL(PUBLIC_URL).origin;
+  } catch {
+    return false;
+  }
 }
