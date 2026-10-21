@@ -4,16 +4,16 @@
       "id": "website",
       "name": "bayfield.dev",
       "url": "https://bayfield.dev",
-      "description": "My website: projects, posts and how to reach me.",
+      "description": "Paul Bayfield's portfolio website.",
       "category": "Websites",
-      "icon": "https://bayfield.dev/favicon.svg"
+      "icon": "https://bayfield.dev/images/avatar.webp"
     },
     {
       "id": "concerts",
       "name": "Concerts",
       "url": "https://concerts.bayfield.dev",
-      "description": "The concerts I've been to and the ones coming up.",
-      "category": "Websites"
+      "description": "Track every concert you've been to.",
+      "category": "Applications"
     }
   ]
 }
