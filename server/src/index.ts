@@ -40,7 +40,8 @@ app.use(
       styleSrc: ["'self'", "'unsafe-inline'"],
       // App icons live wherever their apps (or Authentik) host them.
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
+      // prefs.bayfield.dev: the preferences shared with the other apps.
+      connectSrc: ["'self'", "https://prefs.bayfield.dev"],
       frameAncestors: ["'none'"],
       formAction: ["'self'"],
       baseUri: ["'self'"],

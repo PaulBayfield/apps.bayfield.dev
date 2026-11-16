@@ -11,6 +11,7 @@ import { AppsPage } from "./components/AppsPage";
 import { DetailsPanel } from "./components/DetailsPanel";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SearchDialog } from "./components/SearchDialog";
+import { usePrefsSync } from "./lib/prefs";
 
 export default function App() {
   return (
@@ -45,6 +46,8 @@ function Root() {
 
 function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => void; onSignedOut: () => void }) {
   const { settings, update } = useSettings();
+  // Shared with the other bayfield.dev apps (prefs.bayfield.dev).
+  usePrefsSync({ theme: settings.theme, language: settings.language }, update);
   const toast = useToast();
   const router = useRouter();
   const mobile = useMediaQuery(MOBILE_QUERY);

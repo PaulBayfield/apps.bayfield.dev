@@ -4,6 +4,7 @@ import type { StringKey } from "../../lib/i18n";
 import type { UpdateCheck } from "../../lib/updates";
 import { ExternalLink } from "../icons";
 import { PageHeader, Row, Switch } from "./common";
+import { connectPrefs, disconnectPrefs, usePrefsStatus } from "../../lib/prefs";
 
 // --- Preferences ---
 
@@ -67,6 +68,7 @@ export function PreferencesPage() {
           <Switch checked={settings.descriptions} onChange={(on) => update({ descriptions: on })} label={t("showDescriptions")} />
         </Row>
       </section>
+      <PrefsSyncRow />
     </>
   );
 }
@@ -138,5 +140,35 @@ export function AboutPage({ updates }: { updates: UpdateCheck }) {
         </Row>
       </section>
     </>
+  );
+}
+
+/** Theme and language shared with the other bayfield.dev apps, through prefs.bayfield.dev. */
+function PrefsSyncRow() {
+  const { t } = useSettings();
+  const { status, email } = usePrefsStatus();
+  const hint =
+    status === "connected"
+      ? t("prefsConnected", { email: email ?? "" })
+      : status === "connecting"
+        ? t("prefsApprove")
+        : status === "offline"
+          ? t("prefsOffline")
+          : t("prefsHint");
+  return (
+    <section className="settings-rows">
+      <h3>{t("prefsTitle")}</h3>
+      <Row label={t("prefsLabel")} hint={hint}>
+        {status === "connected" ? (
+          <button className="text-button" onClick={() => void disconnectPrefs()}>
+            {t("prefsDisconnect")}
+          </button>
+        ) : status === "disconnected" || status === "connecting" ? (
+          <button className="primary-button" onClick={() => void connectPrefs("Apps")}>
+            {t("prefsConnect")}
+          </button>
+        ) : null}
+      </Row>
+    </section>
   );
 }
