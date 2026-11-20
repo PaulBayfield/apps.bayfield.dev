@@ -23,11 +23,50 @@ export default function App() {
   );
 }
 
+// Signing in at Authentik (or in another bayfield.dev app) doesn't give this app a session by itself:
+// when signed out, check once with Authentik without showing anything (prompt=none). Not again in this
+// tab for a while, unless coming from another site (such as Authentik right after signing in there),
+// and not after signing out here, until signing in again.
+const SILENT_TRIED = "apps:silent-signin";
+const SIGNED_OUT = "apps:signed-out";
+const SILENT_EVERY = 10 * 60_000;
+
+function trySilentSignIn(): boolean {
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.has("signin") || q.has("signin_error") || localStorage.getItem(SIGNED_OUT)) return false;
+    const fromElsewhere = !!document.referrer && new URL(document.referrer).origin !== location.origin;
+    if (!fromElsewhere && Date.now() - Number(sessionStorage.getItem(SILENT_TRIED) ?? 0) < SILENT_EVERY) return false;
+    sessionStorage.setItem(SILENT_TRIED, String(Date.now()));
+  } catch {
+    return false; // Without storage there's no way to avoid trying on every load.
+  }
+  location.replace(`/api/auth/oidc/start?silent=1&next=${encodeURIComponent(location.pathname + location.search)}`);
+  return true;
+}
+
+const rememberSignedOut = (out: boolean) => {
+  try {
+    if (out) localStorage.setItem(SIGNED_OUT, "1");
+    else localStorage.removeItem(SIGNED_OUT);
+  } catch {
+    /* ignore */
+  }
+};
+
 function Root() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
 
   const loadMe = useCallback(() => {
-    api<Me>("/auth/me").then(setMe, () => setMe(null));
+    api<Me>("/auth/me").then(
+      (m) => {
+        rememberSignedOut(false);
+        setMe(m);
+      },
+      () => {
+        if (!trySilentSignIn()) setMe(null);
+      },
+    );
   }, []);
 
   useEffect(loadMe, [loadMe]);
@@ -70,7 +109,7 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
     const q = new URLSearchParams(location.search);
     const error = q.get("signin_error");
     if (error) toast(error, "error");
-    if (error || q.has("settings")) router.setQuery({ signin_error: undefined, settings: undefined }, true);
+    if (error || q.has("settings") || q.has("signin")) router.setQuery({ signin_error: undefined, settings: undefined, signin: undefined }, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -111,6 +150,7 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
   );
 
   const signIn = useCallback(() => {
+    rememberSignedOut(false);
     if (auth?.oidc) location.href = `/api/auth/oidc/start?next=${encodeURIComponent(location.pathname + location.search)}`;
     else if (auth?.dev) {
       void api("/auth/dev-login", { method: "POST" }).then(() => {
@@ -153,6 +193,8 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
     openSettings: (page) => setSettingsPage(page ?? (me ? "account" : "preferences")),
     signIn,
     signOut: () => {
+      // The Authentik session outlives this one: don't sign straight back in silently.
+      rememberSignedOut(true);
       void api("/auth/logout", { method: "POST" }).finally(() => {
         invalidate();
         setSettingsPage(null);

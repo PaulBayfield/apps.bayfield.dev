@@ -25,6 +25,8 @@ interface OidcState {
   nonce: string;
   next: string;
   reauth: boolean;
+  /** prompt=none: only picks up an existing Authentik session, never shows a sign-in page. */
+  silent?: boolean;
   exp: number;
 }
 
@@ -152,19 +154,38 @@ authRoutes.post("/logout", (c) => {
 });
 
 /** `?reauth=1` makes Authentik ask for the password again (before a password change); `?next=/path` returns there. */
+/**
+ * `?silent=1` checks whether the user is already signed in at Authentik (prompt=none) and comes back
+ * either signed in or with `?signin=none`, never showing a page: that is how signing in at Authentik
+ * (or in another bayfield.dev app) is picked up here without clicking "Sign in".
+ */
 authRoutes.get("/oidc/start", async (c) => {
-  rateLimit(c, "signin", 30, 10 * 60_000);
-  const url = await authorizeUrl(c, { next: c.req.query("next"), reauth: c.req.query("reauth") === "1" });
-  return c.redirect(url.toString());
+  const silent = c.req.query("silent") === "1";
+  try {
+    rateLimit(c, "signin", 30, 10 * 60_000);
+    if (silent && !oidc) throw new HttpError(404, "Sign-in isn't configured");
+    const url = await authorizeUrl(c, { next: c.req.query("next"), reauth: !silent && c.req.query("reauth") === "1", silent });
+    return c.redirect(url.toString());
+  } catch (e) {
+    if (!silent) throw e;
+    return c.redirect(withQuery(safeNext(c.req.query("next")), "signin", "none"));
+  }
 });
+
+const withQuery = (path: string, key: string, value: string) => {
+  const u = new URL(path, PUBLIC_URL);
+  u.searchParams.set(key, value);
+  return u.pathname + u.search;
+};
 
 /**
  * The authorization request for this app, remembering where to come back to (in a sealed cookie).
  * `minutes`: how long the round trip may take (longer when it goes through a setup flow first).
  */
-export async function authorizeUrl(c: Context, opts: { next?: string; reauth?: boolean; minutes?: number }): Promise<URL> {
+export async function authorizeUrl(c: Context, opts: { next?: string; reauth?: boolean; silent?: boolean; minutes?: number }): Promise<URL> {
   const d = await discover();
   const reauth = !!opts.reauth;
+  const silent = !reauth && !!opts.silent;
   const minutes = opts.minutes ?? 10;
   const st: OidcState = {
     state: randomToken(24),
@@ -172,6 +193,7 @@ export async function authorizeUrl(c: Context, opts: { next?: string; reauth?: b
     nonce: randomToken(16),
     next: safeNext(opts.next),
     reauth,
+    silent,
     exp: Date.now() + minutes * 60_000,
   };
   setCookie(c, STATE, seal(st), { ...cookieOptions, maxAge: minutes * 60 });
@@ -186,6 +208,7 @@ export async function authorizeUrl(c: Context, opts: { next?: string; reauth?: b
     code_challenge: challenge(st.verifier),
     code_challenge_method: "S256",
     ...(reauth ? { prompt: "login", max_age: "0" } : {}),
+    ...(silent ? { prompt: "none" } : {}),
   }).toString();
   return url;
 }
@@ -195,9 +218,9 @@ authRoutes.get("/oidc/callback", async (c) => {
   deleteCookie(c, STATE, { path: "/", secure: SECURE_COOKIES });
   const back = (path: string, error?: string) => {
     if (!error) return c.redirect(path);
-    const u = new URL(path, PUBLIC_URL);
-    u.searchParams.set("signin_error", error);
-    return c.redirect(u.pathname + u.search);
+    // A silent check that didn't sign in (usually login_required: no Authentik session) isn't an error to show.
+    if (st?.silent) return c.redirect(withQuery(path, "signin", "none"));
+    return c.redirect(withQuery(path, "signin_error", error));
   };
   const { code, state, error, error_description } = c.req.query();
   if (error) return back(st?.next ?? "/", error_description || error);
