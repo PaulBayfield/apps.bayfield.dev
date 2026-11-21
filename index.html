@@ -13,6 +13,8 @@
         var t = JSON.parse(localStorage.getItem("apps.settings") || "{}").theme || "system";
         document.documentElement.dataset.theme =
           t === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t;
+        var v = JSON.parse(localStorage.getItem("apps.themeVars") || "{}");
+        for (var k in v) document.documentElement.style.setProperty(k, v[k]);
       } catch (e) {}
     </script>
   </head>

@@ -86,7 +86,7 @@ function Root() {
 function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => void; onSignedOut: () => void }) {
   const { settings, update } = useSettings();
   // Shared with the other bayfield.dev apps (prefs.bayfield.dev).
-  usePrefsSync({ theme: settings.theme, language: settings.language }, update);
+  usePrefsSync({ theme: settings.theme, customThemes: settings.customThemes, customTheme: settings.customTheme, language: settings.language }, update);
   const toast = useToast();
   const router = useRouter();
   const mobile = useMediaQuery(MOBILE_QUERY);
