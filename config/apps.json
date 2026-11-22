@@ -13,7 +13,8 @@
       "name": "Concerts",
       "url": "https://concerts.bayfield.dev",
       "description": "Track every concert you've been to.",
-      "category": "Applications"
+      "category": "Applications",
+      "icon": "https://concerts.bayfield.dev/favicon.ico"
     }
   ]
 }
