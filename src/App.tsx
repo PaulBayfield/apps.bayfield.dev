@@ -221,10 +221,10 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
     [favorites.ids, apps],
   );
 
-  // The admin pages are for Authentik superusers only (the server checks too).
+  // The admin pages are for superusers and ADMIN_GROUPS members only (the server checks too).
   const isAdminRoute = router.route.name === "admin";
   useEffect(() => {
-    if (isAdminRoute && !me?.isSuperuser) router.navigate({ name: "home" }, {});
+    if (isAdminRoute && !me?.isAdmin) router.navigate({ name: "home" }, {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdminRoute, me]);
 
@@ -292,12 +292,12 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
           </>
         )}
         <main className="main">
-          {isAdminRoute && me?.isSuperuser ? <AdminPage /> : <AppsPage favorites={favoriteApps} />}
+          {isAdminRoute && me?.isAdmin ? <AdminPage /> : <AppsPage favorites={favoriteApps} />}
         </main>
         {panelVisible && (
           <>
             {mobile && <div className="sidebar-backdrop" onClick={closePanel} />}
-            {isAdminRoute && me?.isSuperuser ? <AdminPanel /> : <DetailsPanel />}
+            {isAdminRoute && me?.isAdmin ? <AdminPanel /> : <DetailsPanel />}
           </>
         )}
       </div>

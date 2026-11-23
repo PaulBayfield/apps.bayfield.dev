@@ -46,7 +46,7 @@ export function Sidebar({ favorites }: { favorites: App[] }) {
 
       {/* Only the lists scroll; the header and pages stay put. */}
       <div className="sidebar-scroll">
-        {me?.isSuperuser && (
+        {me?.isAdmin && (
           <div className="sidebar-group">
             <div className="sidebar-group-title">{t("administration")}</div>
             {(

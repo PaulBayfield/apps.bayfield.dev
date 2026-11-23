@@ -5,7 +5,7 @@
 //
 // Without Authentik (DEV_LOGIN_USER), a small in-memory stand-in answers instead.
 
-import { DEV_LOGIN_USER, authentik } from "./config.ts";
+import { ADMIN_GROUPS, DEV_LOGIN_USER, authentik } from "./config.ts";
 import { HttpError } from "./http.ts";
 
 export interface AkUser {
@@ -285,6 +285,34 @@ export function devAddDevice(kind: "totp" | "webauthn") {
     created: new Date().toISOString(),
     lastUsed: null,
   });
+}
+
+/**
+ * Whether `user` may see the admin pages: a superuser, or a member of one of ADMIN_GROUPS. As in
+ * Authentik, a member of a child group counts as a member of its parents.
+ */
+export async function canAdmin(user: AkUser): Promise<boolean> {
+  if (user.isSuperuser) return true;
+  if (!ADMIN_GROUPS.length) return false;
+  const wanted = new Set(ADMIN_GROUPS.map((g) => g.toLowerCase()));
+  const direct = user.groups.some((g) => wanted.has(g.toLowerCase()));
+  if (direct || !authentik) return direct;
+  let groups: Awaited<ReturnType<typeof allGroups>>;
+  try {
+    groups = await allGroups();
+  } catch {
+    return false; // Without "view group", only direct membership is known.
+  }
+  const seen = new Set<string>();
+  const todo = [...user.groupIds];
+  for (let pk = todo.pop(); pk !== undefined; pk = todo.pop()) {
+    if (seen.has(pk)) continue;
+    seen.add(pk);
+    const g = groups.get(pk);
+    if (g && wanted.has(g.name.toLowerCase())) return true;
+    todo.push(...(g?.parents ?? []));
+  }
+  return false;
 }
 
 export function forget(pk: number) {

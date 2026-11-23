@@ -33,6 +33,8 @@ export interface Me {
   avatar: string | null;
   groups: string[];
   isSuperuser: boolean;
+  /** Sees the admin pages: a superuser, or in one of the server's ADMIN_GROUPS. */
+  isAdmin: boolean;
   lastLogin: string | null;
   dateJoined: string | null;
   passwordChangeDate: string | null;

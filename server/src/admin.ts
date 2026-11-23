@@ -1,4 +1,4 @@
-// The admin pages, for Authentik superusers only: accounts, sign-ins and app usage.
+// The admin pages, for Authentik superusers and members of ADMIN_GROUPS: accounts, sign-ins and app usage.
 //
 // No database here either: everything comes from Authentik. Accounts from /core/users/, usage from
 // its event log (login, login_failed, authorize_application: an app opened through Authentik), and
@@ -7,7 +7,7 @@
 import { Hono, type Context, type Next } from "hono";
 import { authentik } from "./config.ts";
 import { type AppEnv } from "./auth.ts";
-import { appsFor, call, devicesFor, toUser, type AkDevice, type AkUser, type RawUser } from "./authentik.ts";
+import { appsFor, call, canAdmin, devicesFor, toUser, type AkDevice, type AkUser, type RawUser } from "./authentik.ts";
 import { HttpError, isTimeZone, rateLimit } from "./http.ts";
 
 const CACHE_MS = 2 * 60_000;
@@ -441,10 +441,10 @@ async function appIcons(): Promise<Map<string, string>> {
 
 // --- Routes ---
 
-async function requireSuperuser(c: Context<AppEnv>, next: Next) {
+async function requireAdmin(c: Context<AppEnv>, next: Next) {
   const user = c.get("user");
   if (!user) throw new HttpError(401, "Not signed in");
-  if (!user.isSuperuser) throw new HttpError(403, "Only administrators can see this");
+  if (!(await canAdmin(user))) throw new HttpError(403, "Only administrators can see this");
   await next();
 }
 
@@ -458,7 +458,7 @@ function params(c: Context) {
 }
 
 export const admin = new Hono<AppEnv>();
-admin.use("*", requireSuperuser);
+admin.use("*", requireAdmin);
 
 admin.get("/overview", async (c) => {
   const { days, tz, fresh } = params(c);

@@ -9,7 +9,7 @@ import { Hono, type Context, type Next } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { DEV_LOGIN_USER, PUBLIC_URL, REAUTH_MINUTES, SECURE_COOKIES, SESSION_DAYS, authentik, oidc } from "./config.ts";
 import { randomToken, seal, unseal } from "./crypto.ts";
-import { findUser, getUser, type AkUser } from "./authentik.ts";
+import { canAdmin, findUser, getUser, type AkUser } from "./authentik.ts";
 import { HttpError, rateLimit } from "./http.ts";
 
 interface SessionData {
@@ -91,7 +91,7 @@ const isDevOrigin = (o: string) => process.env.NODE_ENV !== "production" && /^ht
 /** Only paths on this site ("/…", not "//host" or "/\host"). */
 const safeNext = (v: string | undefined) => (v && /^\/(?![/\\])/.test(v) ? v : "/");
 
-export function meView(user: AkUser, s: SessionData) {
+export async function meView(user: AkUser, s: SessionData) {
   return {
     username: user.username,
     name: user.name,
@@ -99,6 +99,8 @@ export function meView(user: AkUser, s: SessionData) {
     avatar: user.avatar,
     groups: user.groups,
     isSuperuser: user.isSuperuser,
+    /** Sees the admin pages (a superuser, or in one of ADMIN_GROUPS). */
+    isAdmin: await canAdmin(user),
     lastLogin: user.lastLogin,
     dateJoined: user.dateJoined,
     passwordChangeDate: user.passwordChangeDate,
@@ -146,7 +148,7 @@ export const authRoutes = new Hono<AppEnv>();
 
 authRoutes.get("/config", (c) => c.json({ oidc: oidc ? { name: oidc.name } : null, dev: !!DEV_LOGIN_USER }));
 
-authRoutes.get("/me", requireUser, (c) => c.json(meView(c.get("user")!, c.get("session")!)));
+authRoutes.get("/me", requireUser, async (c) => c.json(await meView(c.get("user")!, c.get("session")!)));
 
 authRoutes.post("/logout", (c) => {
   endSession(c);

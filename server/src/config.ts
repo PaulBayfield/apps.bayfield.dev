@@ -94,5 +94,14 @@ if (!oidc && !DEV_LOGIN_USER) {
   console.warn("OIDC_ISSUER isn't set: sign-in is off and only the public apps are listed.");
 }
 
+/**
+ * Who sees the admin pages besides Authentik superusers: members of these Authentik groups
+ * (comma-separated names), directly or through a child group.
+ */
+export const ADMIN_GROUPS = (process.env.ADMIN_GROUPS ?? "")
+  .split(",")
+  .map((g) => g.trim())
+  .filter(Boolean);
+
 /** Header your reverse proxy puts the visitor IP in (e.g. cf-connecting-ip). Unset: the TCP peer. */
 export const CLIENT_IP_HEADER = process.env.CLIENT_IP_HEADER?.toLowerCase();

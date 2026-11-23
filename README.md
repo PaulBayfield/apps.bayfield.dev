@@ -24,7 +24,7 @@ This is a personal project built for my own use, not a polished product: expect 
 - **Account:** username, name, email and groups are shown read-only (an admin changes them in Authentik). The password can be changed here; that needs a sign-in less than 10 minutes old, otherwise Authentik asks for the password again first.
 - **Two-factor authentication:** see your authenticator apps and passkeys, add new ones, remove old ones (removing also needs a recent sign-in).
 - Same UI as [Calendar](https://github.com/PaulBayfield/calendar.bayfield.dev), [Notes](https://github.com/PaulBayfield/notes.bayfield.dev) and [DevTime](https://github.com/PaulBayfield/dev.bayfield.dev): header, resizable sidebar, right panel (filters / app details), the five themes, Ctrl+K palette, settings dialog, and the GitHub version check in Settings → About.
-- **Admin pages** (Authentik superusers only): accounts, sign-ins, app usage, failed sign-ins and two-factor coverage over the last 7, 30 or 90 days, a sortable user list, the event log, and a panel per user. See Admin Pages below.
+- **Admin pages** (Authentik superusers, and members of the groups in `ADMIN_GROUPS`): accounts, sign-ins, app usage, failed sign-ins and two-factor coverage over the last 7, 30 or 90 days, a sortable user list, the event log, and a panel per user. See Admin Pages below.
 - Favorites (keys 1–9) and recently opened apps, saved on the device. English and French.
 - No database: the session is an encrypted cookie (AES-256-GCM).
 
@@ -61,7 +61,7 @@ Notes:
 
 ## 📊 • Admin Pages
 
-Signed in as an Authentik **superuser**, the sidebar shows *Administration*: Overview, Users and Activity (`/admin`, `/admin/users`, `/admin/activity`). Everyone else gets a 403 from `/api/admin/*`. Everything is read from Authentik (cached for two minutes, the refresh button asks again); changes to accounts are made in Authentik, linked from each user's panel.
+Signed in as an Authentik **superuser**, or as a member of one of the groups named in `ADMIN_GROUPS` (comma-separated, e.g. `ADMIN_GROUPS=Admins,Support`), the sidebar shows *Administration*: Overview, Users and Activity (`/admin`, `/admin/users`, `/admin/activity`). As in Authentik, being in a child group counts as being in its parent; that needs the *view group* permission, without it only direct membership counts. Everyone else gets a 403 from `/api/admin/*`. Everything is read from Authentik (cached for two minutes, the refresh button asks again); changes to accounts are made in Authentik, linked from each user's panel.
 
 - **Overview:** accounts (active / deactivated / new), active users, sign-ins, app opens and failed sign-ins over the period, two-factor coverage, activity per day, the most opened apps and most active users, when accounts were last seen, failed sign-ins by username and address, and sign-ins by country (when Authentik has GeoIP).
 - **Users:** every account with when they were last seen, sign-ins and app opens in the period, their two-factor methods, groups and join date. Filter by active, administrators, without two-factor, not seen in 30 days, deactivated, service accounts.

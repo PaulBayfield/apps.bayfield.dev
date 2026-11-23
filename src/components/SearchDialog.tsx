@@ -40,7 +40,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
     const pages: [StringKey, ReactNode, () => void][] = [
       ["home", <LayoutGrid size={16} />, () => navigate({ name: "home" })],
       ["recent", <Clock size={16} />, () => navigate({ name: "recent" })],
-      ...(me?.isSuperuser
+      ...(me?.isAdmin
         ? ([
             ["adminOverview", <BarChart size={16} />, () => navigate({ name: "admin", tab: "overview" })],
             ["adminUsers", <Users size={16} />, () => navigate({ name: "admin", tab: "users" })],
