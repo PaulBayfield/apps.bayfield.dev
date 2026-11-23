@@ -9,6 +9,8 @@ import { ToastProvider, useToast } from "./components/common";
 import { Sidebar } from "./components/Sidebar";
 import { AppsPage } from "./components/AppsPage";
 import { DetailsPanel } from "./components/DetailsPanel";
+import { AdminPage } from "./components/admin/AdminPage";
+import { AdminPanel } from "./components/admin/AdminPanel";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SearchDialog } from "./components/SearchDialog";
 import { usePrefsSync } from "./lib/prefs";
@@ -127,7 +129,11 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
   const closePanel = () => {
     if (mobile) setMobilePanel(false);
     else update({ panel: false });
-    if (router.query.app) router.setQuery({ app: undefined }, true);
+    if (router.query.app || router.query.user) router.setQuery({ app: undefined, user: undefined }, true);
+  };
+  const openPanel = () => {
+    if (mobile) setMobilePanel(true);
+    else if (!settings.panel) update({ panel: true });
   };
   const togglePanel = () => {
     if (panelVisible) closePanel();
@@ -185,10 +191,11 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
     launch,
     select: (id) => {
       router.setQuery({ app: id }, true);
-      if (id) {
-        if (mobile) setMobilePanel(true);
-        else if (!settings.panel) update({ panel: true });
-      }
+      if (id) openPanel();
+    },
+    selectUser: (pk) => {
+      router.setQuery({ user: pk === undefined ? undefined : String(pk) }, true);
+      if (pk !== undefined) openPanel();
     },
     openSettings: (page) => setSettingsPage(page ?? (me ? "account" : "preferences")),
     signIn,
@@ -213,6 +220,13 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
     () => favorites.ids.map((id) => apps?.find((a) => a.id === id)).filter((a): a is AppItem => !!a),
     [favorites.ids, apps],
   );
+
+  // The admin pages are for Authentik superusers only (the server checks too).
+  const isAdminRoute = router.route.name === "admin";
+  useEffect(() => {
+    if (isAdminRoute && !me?.isSuperuser) router.navigate({ name: "home" }, {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdminRoute, me]);
 
   // A selected app that isn't in the list any more (signed out, access removed).
   useEffect(() => {
@@ -259,7 +273,7 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
       else if (k === "escape" && mobile && (drawer || mobilePanel)) {
         setDrawer(false);
         if (mobilePanel) closePanel();
-      } else if (k === "escape" && selected) router.setQuery({ app: undefined }, true);
+      } else if (k === "escape" && (selected || router.query.user)) router.setQuery({ app: undefined, user: undefined }, true);
       else if (/^[1-9]$/.test(k) && favoriteApps[Number(k) - 1]) launch(favoriteApps[Number(k) - 1]);
       else return;
       e.preventDefault();
@@ -278,12 +292,12 @@ function Shell({ me, reloadMe, onSignedOut }: { me: Me | null; reloadMe: () => v
           </>
         )}
         <main className="main">
-          <AppsPage favorites={favoriteApps} />
+          {isAdminRoute && me?.isSuperuser ? <AdminPage /> : <AppsPage favorites={favoriteApps} />}
         </main>
         {panelVisible && (
           <>
             {mobile && <div className="sidebar-backdrop" onClick={closePanel} />}
-            <DetailsPanel />
+            {isAdminRoute && me?.isSuperuser ? <AdminPanel /> : <DetailsPanel />}
           </>
         )}
       </div>

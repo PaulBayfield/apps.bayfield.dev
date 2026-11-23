@@ -126,3 +126,115 @@ export interface AppAccess {
   /** Policies bound to the app (what they decide isn't known here). */
   policies: string[];
 }
+
+// --- Admin pages (Authentik superusers only) ---
+
+export type AdminWarning = "events" | "mfa" | "apps";
+
+/** One day of the chosen period, in the viewer's time zone. */
+export interface DayPoint {
+  /** YYYY-MM-DD */
+  day: string;
+  logins: number;
+  failed: number;
+  appOpens: number;
+  /** Distinct accounts that signed in or opened an app. */
+  users: number;
+}
+
+export interface AdminOverview {
+  days: number;
+  generatedAt: string;
+  warnings: AdminWarning[];
+  /** More events than the server reads per period (only the latest were counted). */
+  truncated: boolean;
+  users: {
+    total: number;
+    active: number;
+    inactive: number;
+    superusers: number;
+    serviceAccounts: number;
+    /** Null: the authenticators couldn't be read. */
+    withMfa: number | null;
+    neverSignedIn: number;
+    seen1d: number;
+    seen7d: number;
+    seen30d: number;
+    joinedInRange: number;
+  };
+  totals: { logins: number; failed: number; appOpens: number; activeUsers: number };
+  series: DayPoint[];
+  apps: { name: string; icon: string | null; opens: number; users: number }[];
+  topUsers: { pk: number; username: string; name: string; avatar: string | null; logins: number; appOpens: number; lastSeen: string | null }[];
+  failed: { byUsername: { key: string; count: number; known: boolean }[]; byIp: { key: string; country: string | null; count: number }[] };
+  countries: { key: string; count: number }[];
+}
+
+export interface MfaSummary {
+  totp: number;
+  webauthn: number;
+  other: number;
+}
+
+export interface AdminUserRow {
+  pk: number;
+  username: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  isActive: boolean;
+  isSuperuser: boolean;
+  kind: "person" | "service";
+  groups: string[];
+  dateJoined: string | null;
+  passwordChangeDate: string | null;
+  lastSeen: string | null;
+  logins: number;
+  appOpens: number;
+  failed: number;
+  /** Null: unknown (deactivated, service account, or not readable). */
+  mfa: MfaSummary | null;
+}
+
+export interface AdminUsers {
+  days: number;
+  warnings: AdminWarning[];
+  truncated: boolean;
+  users: AdminUserRow[];
+}
+
+export interface UsageEvent {
+  id: string;
+  kind: "login" | "failed" | "app";
+  at: string;
+  pk: number | null;
+  /** The account's username, or what was typed in for a failed sign-in. */
+  username: string;
+  app: string | null;
+  ip: string | null;
+  country: string | null;
+  city: string | null;
+  userAgent: string | null;
+}
+
+export interface AdminEvents {
+  days: number;
+  warnings: AdminWarning[];
+  truncated: boolean;
+  total: number;
+  events: UsageEvent[];
+}
+
+export interface AdminUserDetail {
+  days: number;
+  warnings: AdminWarning[];
+  truncated: boolean;
+  user: Omit<AdminUserRow, "logins" | "appOpens" | "failed" | "mfa"> & { lastLogin: string | null };
+  totals: { logins: number; appOpens: number; failed: number };
+  series: DayPoint[];
+  devices: MfaDevice[] | null;
+  apps: { slug: string; name: string; icon: string | null; url: string; opens: number; lastOpened: string | null }[] | null;
+  events: UsageEvent[];
+  /** The user's page in Authentik's admin interface. */
+  adminUrl: string | null;
+}

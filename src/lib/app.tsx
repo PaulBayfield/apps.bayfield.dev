@@ -27,6 +27,8 @@ export interface AppContextValue {
   launch: (app: App) => void;
   /** Shows an app in the details panel. */
   select: (id: string | undefined) => void;
+  /** Admin pages: shows a user (by Authentik pk) in the details panel. */
+  selectUser: (pk: number | undefined) => void;
   openSettings: (page?: SettingsPage) => void;
   signIn: () => void;
   signOut: () => void;

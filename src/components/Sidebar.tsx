@@ -4,7 +4,7 @@ import { byCategory, useApp } from "../lib/app";
 import { recordOpened, useRecent } from "../lib/local";
 import { useSettings } from "../lib/settings";
 import { AppIcon } from "./AppIcon";
-import { Clock, Folder, Gear, LayoutGrid, PanelLeft, Search } from "./icons";
+import { BarChart, Clock, Folder, Gear, LayoutGrid, PanelLeft, Search, Table, Users } from "./icons";
 
 const MIN_W = 200;
 const MAX_W = 480;
@@ -46,6 +46,23 @@ export function Sidebar({ favorites }: { favorites: App[] }) {
 
       {/* Only the lists scroll; the header and pages stay put. */}
       <div className="sidebar-scroll">
+        {me?.isSuperuser && (
+          <div className="sidebar-group">
+            <div className="sidebar-group-title">{t("administration")}</div>
+            {(
+              [
+                ["overview", "adminOverview", <BarChart key="o" />],
+                ["users", "adminUsers", <Users key="u" />],
+                ["activity", "adminActivity", <Table key="a" />],
+              ] as const
+            ).map(([tab, label, icon]) => (
+              <button key={tab} className={`sidebar-row${route.name === "admin" && route.tab === tab ? " active" : ""}`} onClick={() => navigate({ name: "admin", tab })}>
+                {icon}
+                <span className="row-label">{t(label)}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {favorites.length > 0 && (
           <div className="sidebar-group">
             <div className="sidebar-group-title">{t("favorites")}</div>

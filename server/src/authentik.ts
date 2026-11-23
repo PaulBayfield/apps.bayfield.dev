@@ -42,7 +42,7 @@ export interface AkApp {
 
 const CACHE_MS = 60_000;
 
-async function call<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+export async function call<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   if (!authentik) throw new HttpError(503, "Authentik isn't configured");
   let res: Response;
   try {
@@ -92,7 +92,7 @@ function iconUrl(icon: unknown): string | null {
   return null;
 }
 
-interface RawUser {
+export interface RawUser {
   pk: number;
   username: string;
   name: string;
@@ -101,12 +101,14 @@ interface RawUser {
   is_superuser: boolean;
   avatar?: string;
   groups_obj?: { pk: string; name: string }[] | null;
+  /** "internal", "external", "service_account" or "internal_service_account" (outposts). */
+  type?: string;
   last_login?: string | null;
   date_joined?: string | null;
   password_change_date?: string | null;
 }
 
-const toUser = (u: RawUser): AkUser => ({
+export const toUser = (u: RawUser): AkUser => ({
   pk: u.pk,
   username: u.username,
   name: u.name ?? "",
@@ -228,7 +230,7 @@ export interface AkDevice {
   lastUsed: string | null;
 }
 
-interface RawDevice {
+export interface RawDevice {
   pk: string | number;
   name: string;
   type: string;
@@ -239,7 +241,7 @@ interface RawDevice {
   extra_description?: string | null;
 }
 
-const kindOf = (type: string): DeviceKind => (/\.TOTPDevice$/.test(type) ? "totp" : /\.WebAuthnDevice$/.test(type) ? "webauthn" : "other");
+export const kindOf = (type: string): DeviceKind => (/\.TOTPDevice$/.test(type) ? "totp" : /\.WebAuthnDevice$/.test(type) ? "webauthn" : "other");
 
 /** Every confirmed authenticator `pk` has (authenticator apps, passkeys, recovery codes…). Never cached. */
 export async function devicesFor(pk: number): Promise<AkDevice[]> {
@@ -300,7 +302,8 @@ function devUser(username: string | undefined): AkUser | null {
     name: "Demo User",
     email: `${DEV_LOGIN_USER}@example.com`,
     isActive: true,
-    isSuperuser: false,
+    // A superuser, so the admin pages can be tried locally.
+    isSuperuser: true,
     avatar: null,
     groups: ["Family", "Developers"],
     groupIds: ["g-family", "g-developers"],

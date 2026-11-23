@@ -8,7 +8,7 @@ import { useSettings } from "../lib/settings";
 import type { StringKey } from "../lib/i18n";
 import { AppIcon } from "./AppIcon";
 import { matches } from "./AppsPage";
-import { Clock, Folder, Gear, LayoutGrid, Search } from "./icons";
+import { BarChart, Clock, Folder, Gear, LayoutGrid, Search, Table, Users } from "./icons";
 
 interface Result {
   key: string;
@@ -40,6 +40,13 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
     const pages: [StringKey, ReactNode, () => void][] = [
       ["home", <LayoutGrid size={16} />, () => navigate({ name: "home" })],
       ["recent", <Clock size={16} />, () => navigate({ name: "recent" })],
+      ...(me?.isSuperuser
+        ? ([
+            ["adminOverview", <BarChart size={16} />, () => navigate({ name: "admin", tab: "overview" })],
+            ["adminUsers", <Users size={16} />, () => navigate({ name: "admin", tab: "users" })],
+            ["adminActivity", <Table size={16} />, () => navigate({ name: "admin", tab: "activity" })],
+          ] as [StringKey, ReactNode, () => void][])
+        : []),
     ];
     for (const [label, icon, run] of pages) if (keep(t(label))) out.push({ key: `page:${label}`, section: "pages", title: t(label), icon, run: done(run) });
     if (q) {

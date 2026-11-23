@@ -3,11 +3,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type Route = { name: "home" } | { name: "recent" } | { name: "category"; category: string };
+export type AdminTab = "overview" | "users" | "activity";
+
+export type Route = { name: "home" } | { name: "recent" } | { name: "category"; category: string } | { name: "admin"; tab: AdminTab };
 
 export function parseRoute(path: string): Route {
   const parts = path.replace(/^\/+|\/+$/g, "").split("/").map(decodeURIComponent);
   if (parts[0] === "recent") return { name: "recent" };
+  if (parts[0] === "admin") return { name: "admin", tab: parts[1] === "users" || parts[1] === "activity" ? parts[1] : "overview" };
   if (parts[0] === "c" && parts[1] !== undefined) return { name: "category", category: parts.slice(1).join("/") };
   return { name: "home" };
 }
@@ -18,6 +21,8 @@ export function routePath(r: Route): string {
       return "/recent";
     case "category":
       return `/c/${encodeURIComponent(r.category)}`;
+    case "admin":
+      return r.tab === "overview" ? "/admin" : `/admin/${r.tab}`;
     default:
       return "/";
   }
@@ -36,10 +41,13 @@ export function useRouter() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  /** Goes to a page; the access filter and selected app carry over unless `query` says otherwise. */
+  /**
+   * Goes to a page; the access filter and selected app carry over unless `query` says otherwise
+   * (between admin pages: the period and the selected user).
+   */
   const navigate = useCallback((route: Route, query?: Record<string, string>) => {
     setState((s) => {
-      const q = query ?? pick(s.query, ["access", "app"]);
+      const q = query ?? (route.name === "admin" ? (s.route.name === "admin" ? pick(s.query, ["days", "user"]) : {}) : pick(s.query, ["access", "app"]));
       const search = new URLSearchParams(q).toString();
       history.pushState(null, "", routePath(route) + (search ? `?${search}` : ""));
       return { route, query: q };

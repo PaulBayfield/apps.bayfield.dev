@@ -24,6 +24,7 @@ This is a personal project built for my own use, not a polished product: expect 
 - **Account:** username, name, email and groups are shown read-only (an admin changes them in Authentik). The password can be changed here; that needs a sign-in less than 10 minutes old, otherwise Authentik asks for the password again first.
 - **Two-factor authentication:** see your authenticator apps and passkeys, add new ones, remove old ones (removing also needs a recent sign-in).
 - Same UI as [Calendar](https://github.com/PaulBayfield/calendar.bayfield.dev), [Notes](https://github.com/PaulBayfield/notes.bayfield.dev) and [DevTime](https://github.com/PaulBayfield/dev.bayfield.dev): header, resizable sidebar, right panel (filters / app details), the five themes, Ctrl+K palette, settings dialog, and the GitHub version check in Settings → About.
+- **Admin pages** (Authentik superusers only): accounts, sign-ins, app usage, failed sign-ins and two-factor coverage over the last 7, 30 or 90 days, a sortable user list, the event log, and a panel per user. See Admin Pages below.
 - Favorites (keys 1–9) and recently opened apps, saved on the device. English and French.
 - No database: the session is an encrypted cookie (AES-256-GCM).
 
@@ -57,6 +58,17 @@ Notes:
 - **Removing** one goes through the API and needs a sign-in less than 10 minutes old.
 - **Making it mandatory** is Authentik's job: in your authentication flow's *Authenticator Validation* stage, set *Not configured action* to *Force the user to configure an authenticator* and select the TOTP and WebAuthn setup stages. Every user without 2FA then sets it up at their next sign-in.
 
+
+## 📊 • Admin Pages
+
+Signed in as an Authentik **superuser**, the sidebar shows *Administration*: Overview, Users and Activity (`/admin`, `/admin/users`, `/admin/activity`). Everyone else gets a 403 from `/api/admin/*`. Everything is read from Authentik (cached for two minutes, the refresh button asks again); changes to accounts are made in Authentik, linked from each user's panel.
+
+- **Overview:** accounts (active / deactivated / new), active users, sign-ins, app opens and failed sign-ins over the period, two-factor coverage, activity per day, the most opened apps and most active users, when accounts were last seen, failed sign-ins by username and address, and sign-ins by country (when Authentik has GeoIP).
+- **Users:** every account with when they were last seen, sign-ins and app opens in the period, their two-factor methods, groups and join date. Filter by active, administrators, without two-factor, not seen in 30 days, deactivated, service accounts.
+- **Activity:** the latest sign-ins, failed sign-ins and app opens (`authorize_application` events, so apps behind Authentik's OAuth/proxy providers), with address, place and browser.
+- **User panel:** profile, activity chart, authenticators, the apps they can open and how often they opened them, their latest events.
+
+Usage comes from Authentik's event log, so it only goes back as far as Authentik keeps events (*System → Settings → Event retention*), and at most the latest 10,000 events of each kind are counted per period. The service account needs, on top of the permissions above, *view event* (and *view application* for app icons); two-factor coverage uses the same *view TOTP / WebAuthn device* permissions. A missing permission shows a note on the page instead of failing.
 
 ## 🗂️ • Public Apps
 

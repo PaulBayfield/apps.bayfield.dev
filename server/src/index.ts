@@ -10,6 +10,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { APPS_FILE, DEV_LOGIN_USER, DIST_DIR, PORT, PUBLIC_URL, authentik, oidc } from "./config.ts";
+import { admin } from "./admin.ts";
 import { api } from "./api.ts";
 import { authRoutes, loadUser, sameOrigin } from "./auth.ts";
 import { HttpError } from "./http.ts";
@@ -56,6 +57,7 @@ app.get("/api/health", (c) => c.json({ ok: true }));
 
 app.use("/api/*", loadUser);
 app.route("/api/auth", authRoutes);
+app.route("/api/admin", admin);
 app.route("/api", api);
 app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 
