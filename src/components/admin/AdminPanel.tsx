@@ -8,18 +8,26 @@ import { useApi } from "../../lib/hooks";
 import { useSettings } from "../../lib/settings";
 import { AppIcon } from "../AppIcon";
 import { Avatar, CopyButton } from "../common";
-import { ExternalLink, Fingerprint, Key, Smartphone, X } from "../icons";
+import { ChevronLeft, ExternalLink, Fingerprint, Key, Smartphone, X } from "../icons";
 import { DayBars, EventRow, Warnings, usePeriod } from "./shared";
+import { AppAccessDetails } from "./AccessPage";
 
 export function AdminPanel() {
   const { t } = useSettings();
-  const { query, togglePanel } = useApp();
+  const { query, route, setQuery, togglePanel } = useApp();
   const pk = query.user && /^\d+$/.test(query.user) ? Number(query.user) : null;
+  const onAccess = route.name === "admin" && route.tab === "access";
+  const slug = onAccess && query.slug ? query.slug : null;
 
   return (
     <aside className="panel">
       <div className="panel-header">
-        <span className="panel-label">{pk !== null ? t("details") : t("administration")}</span>
+        {pk !== null && slug && (
+          <button className="icon-button" aria-label={t("back")} title={t("back")} onClick={() => setQuery({ user: undefined }, true)}>
+            <ChevronLeft />
+          </button>
+        )}
+        <span className="panel-label">{pk !== null || slug ? t("details") : t("administration")}</span>
         <div className="toolbar-spacer" />
         <button className="icon-button" aria-label={t("close")} title={`${t("close")} (.)`} onClick={togglePanel}>
           <X />
@@ -28,9 +36,11 @@ export function AdminPanel() {
       <div className="panel-body">
         {pk !== null ? (
           <UserDetails pk={pk} />
+        ) : slug ? (
+          <AppAccessDetails slug={slug} />
         ) : (
           <section className="panel-section">
-            <p className="small muted">{t("selectUserHint")}</p>
+            <p className="small muted">{t(onAccess ? "selectAccessAppHint" : "selectUserHint")}</p>
           </section>
         )}
       </div>

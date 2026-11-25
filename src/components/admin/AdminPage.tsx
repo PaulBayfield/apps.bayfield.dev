@@ -12,6 +12,7 @@ import { ChevronDown, ChevronUp, Refresh, Search, X } from "../icons";
 import { Toolbar } from "../Toolbar";
 import { AppIcon } from "../AppIcon";
 import { BarList, DayBars, EventRow, PeriodPicker, UserCell, Warnings, countryName, flag, refreshAdmin, usePeriod } from "./shared";
+import { AccessView } from "./AccessPage";
 
 export function AdminPage() {
   const { t } = useSettings();
@@ -26,7 +27,7 @@ export function AdminPage() {
 
   const refresh = () => {
     setRefreshing(true);
-    refreshAdmin(params).then(
+    refreshAdmin(params, tab).then(
       () => {
         setRefreshing(false);
         setNonce((n) => n + 1);
@@ -38,7 +39,8 @@ export function AdminPage() {
     );
   };
 
-  const title = <>{t(tab === "users" ? "adminUsers" : tab === "activity" ? "adminActivity" : "adminOverview")}</>;
+  const title = <>{t(tab === "users" ? "adminUsers" : tab === "access" ? "adminAccess" : tab === "activity" ? "adminActivity" : "adminOverview")}</>;
+  const filterLabel = t(tab === "users" ? "filterUsers" : tab === "access" ? "filterAccess" : "filterEvents");
 
   return (
     <>
@@ -49,8 +51,8 @@ export function AdminPage() {
             <input
               ref={filterRef}
               className="text-field"
-              placeholder={t(tab === "users" ? "filterUsers" : "filterEvents")}
-              aria-label={t(tab === "users" ? "filterUsers" : "filterEvents")}
+              placeholder={filterLabel}
+              aria-label={filterLabel}
               value={query.q ?? ""}
               onChange={(e) => setQuery({ q: e.target.value }, true)}
               onKeyDown={(e) => {
@@ -67,14 +69,14 @@ export function AdminPage() {
             )}
           </div>
         )}
-        <PeriodPicker />
+        {tab !== "access" && <PeriodPicker />}
         <button className="icon-button hide-mobile" title={t("refresh")} aria-label={t("refresh")} onClick={refresh} disabled={refreshing}>
           <Refresh />
         </button>
       </Toolbar>
       <div className="content">
         <div className="page admin-page" key={nonce}>
-          {tab === "overview" ? <Overview /> : tab === "users" ? <UsersTable /> : <Activity />}
+          {tab === "overview" ? <Overview /> : tab === "users" ? <UsersTable /> : tab === "access" ? <AccessView /> : <Activity />}
         </div>
       </div>
     </>

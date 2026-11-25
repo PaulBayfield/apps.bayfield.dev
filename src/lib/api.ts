@@ -227,6 +227,48 @@ export interface AdminEvents {
   events: UsageEvent[];
 }
 
+export type AccessWarning = "access" | "rules";
+
+/** One person who can open an app, and what lets them in (empty + !direct: everyone, or a policy). */
+export interface AccessGrant {
+  pk: number;
+  groups: { name: string; via: string | null }[];
+  direct: boolean;
+}
+
+export interface AccessApp {
+  slug: string;
+  name: string;
+  icon: string | null;
+  url: string | null;
+  category: string;
+  mode: "any" | "all";
+  /** The app's bindings in Authentik, or null when they couldn't be read. */
+  rules: { everyone: boolean; groups: string[]; users: number[]; policies: string[] } | null;
+  /** Who can open it, or null when that couldn't be worked out. */
+  users: AccessGrant[] | null;
+}
+
+export interface AccessUser {
+  pk: number;
+  username: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  isSuperuser: boolean;
+  groups: string[];
+}
+
+export interface AdminAccess {
+  generatedAt: string;
+  warnings: AccessWarning[];
+  apps: AccessApp[];
+  /** Every active person (the pks above point here). */
+  users: AccessUser[];
+  /** Authentik's applications page. */
+  adminUrl: string | null;
+}
+
 export interface AdminUserDetail {
   days: number;
   warnings: AdminWarning[];

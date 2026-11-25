@@ -3,14 +3,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type AdminTab = "overview" | "users" | "activity";
+export type AdminTab = "overview" | "users" | "access" | "activity";
 
 export type Route = { name: "home" } | { name: "recent" } | { name: "category"; category: string } | { name: "admin"; tab: AdminTab };
 
 export function parseRoute(path: string): Route {
   const parts = path.replace(/^\/+|\/+$/g, "").split("/").map(decodeURIComponent);
   if (parts[0] === "recent") return { name: "recent" };
-  if (parts[0] === "admin") return { name: "admin", tab: parts[1] === "users" || parts[1] === "activity" ? parts[1] : "overview" };
+  if (parts[0] === "admin") return { name: "admin", tab: parts[1] === "users" || parts[1] === "access" || parts[1] === "activity" ? parts[1] : "overview" };
   if (parts[0] === "c" && parts[1] !== undefined) return { name: "category", category: parts.slice(1).join("/") };
   return { name: "home" };
 }

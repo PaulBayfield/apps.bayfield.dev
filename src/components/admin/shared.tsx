@@ -1,7 +1,7 @@
 // Pieces shared by the admin pages and panel: the period, data loading, the day chart, small lists.
 
 import { useMemo, useState, type ReactNode } from "react";
-import { api, type AdminWarning, type DayPoint, type UsageEvent } from "../../lib/api";
+import { api, type AccessWarning, type AdminWarning, type DayPoint, type UsageEvent } from "../../lib/api";
 import { useApp } from "../../lib/app";
 import { invalidate } from "../../lib/hooks";
 import { useSettings } from "../../lib/settings";
@@ -20,8 +20,8 @@ export function usePeriod() {
 }
 
 /** Asks Authentik again (skipping the server's caches), then reloads what's on screen. */
-export async function refreshAdmin(params: string) {
-  await api(`/admin/overview?${params}&refresh=1`);
+export async function refreshAdmin(params: string, tab?: string) {
+  await api(tab === "access" ? `/admin/access?refresh=1` : `/admin/overview?${params}&refresh=1`);
   invalidate("/admin");
 }
 
@@ -40,9 +40,9 @@ export function PeriodPicker() {
   );
 }
 
-const WARNING_TEXT: Record<AdminWarning, StringKey> = { events: "warnEvents", mfa: "warnMfa", apps: "warnApps" };
+const WARNING_TEXT: Record<AdminWarning | AccessWarning, StringKey> = { events: "warnEvents", mfa: "warnMfa", apps: "warnApps", access: "warnAccess", rules: "warnRules" };
 
-export function Warnings({ warnings, truncated }: { warnings: AdminWarning[]; truncated?: boolean }) {
+export function Warnings({ warnings, truncated }: { warnings: (AdminWarning | AccessWarning)[]; truncated?: boolean }) {
   const { t } = useSettings();
   const list = [...new Set(warnings)].map((w) => t(WARNING_TEXT[w]));
   if (truncated) list.push(t("warnTruncated"));

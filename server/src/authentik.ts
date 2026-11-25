@@ -85,7 +85,7 @@ function authentikError(data: Record<string, unknown> | null): string | null {
 }
 
 /** Icons are stored as "/media/…" paths on Authentik, full URLs, or "fa://" Font Awesome names (not shown). */
-function iconUrl(icon: unknown): string | null {
+export function iconUrl(icon: unknown): string | null {
   if (typeof icon !== "string" || !icon || icon.startsWith("fa://")) return null;
   if (/^https?:\/\//.test(icon)) return icon;
   if (icon.startsWith("/") && authentik) return `${authentik.url}${icon}`;
@@ -373,7 +373,7 @@ export interface AppAccess {
   policies: string[];
 }
 
-interface RawBinding {
+export interface RawBinding {
   enabled: boolean;
   negate: boolean;
   group?: string | null;
@@ -393,7 +393,7 @@ let groupCache: { groups: Map<string, { name: string; parents: string[] }>; unti
 const bindingCache = new Map<string, { bindings: RawBinding[]; until: number }>();
 
 /** Every group with its parents (a minute's cache). */
-async function allGroups() {
+export async function allGroups() {
   if (groupCache && groupCache.until > Date.now()) return groupCache.groups;
   const groups = new Map<string, { name: string; parents: string[] }>();
   for (let page = 1; page && page <= 50; ) {
@@ -406,13 +406,28 @@ async function allGroups() {
   return groups;
 }
 
-async function bindingsOf(appPk: string): Promise<RawBinding[]> {
+export async function bindingsOf(appPk: string): Promise<RawBinding[]> {
   const hit = bindingCache.get(appPk);
   if (hit && hit.until > Date.now()) return hit.bindings;
   const q = new URLSearchParams({ target: appPk, enabled: "true", page_size: "200" });
   const res = await call<{ results: RawBinding[] }>(`/policies/bindings/?${q}`);
   bindingCache.set(appPk, { bindings: res.results, until: Date.now() + CACHE_MS });
   return res.results;
+}
+
+/**
+ * Each group a user is in, directly or through a child group (Authentik counts a child group's
+ * members as members of its parents), mapped to the user's own group it comes through (null: direct).
+ */
+export function groupReach(groupIds: string[], groups: Map<string, { name: string; parents: string[] }>): Map<string, string | null> {
+  const reach = new Map<string, string | null>();
+  const walk = (pk: string, via: string | null) => {
+    if (reach.has(pk)) return;
+    reach.set(pk, via);
+    for (const parent of groups.get(pk)?.parents ?? []) walk(parent, via ?? groups.get(pk)?.name ?? null);
+  };
+  for (const pk of groupIds) walk(pk, null);
+  return reach;
 }
 
 /** Why `user` can open the app `slug`, or null if they can't (or it doesn't exist). */
@@ -424,14 +439,7 @@ export async function appAccess(user: AkUser, slug: string): Promise<AppAccess |
   const [raw, groups] = await Promise.all([bindingsOf(app.pk), allGroups()]);
   const bindings = raw.filter((b) => b.enabled !== false && !b.negate);
 
-  // Each group the user is in, directly or through a child group: the user's own group it comes through.
-  const reach = new Map<string, string | null>();
-  const walk = (pk: string, via: string | null) => {
-    if (reach.has(pk)) return;
-    reach.set(pk, via);
-    for (const parent of groups.get(pk)?.parents ?? []) walk(parent, via ?? groups.get(pk)?.name ?? null);
-  };
-  for (const pk of user.groupIds) walk(pk, null);
+  const reach = groupReach(user.groupIds, groups);
 
   const seen = new Set<string>();
   const granted: AppAccess["groups"] = [];

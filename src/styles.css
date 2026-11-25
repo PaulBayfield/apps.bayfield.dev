@@ -2523,6 +2523,210 @@ a.primary-button:hover {
   color: var(--text-muted);
 }
 
+/* App access: one card per app, with who can open it */
+.access-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.access-head p {
+  margin: 0;
+  flex: 1 1 320px;
+}
+.access-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.access-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+.access-card.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.access-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: -4px;
+  padding: 4px;
+  border-radius: 7px;
+  text-align: left;
+}
+.access-card-head:hover {
+  background: var(--hover);
+}
+.access-card-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.access-card-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.access-card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.access-card-count {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.rule-chips,
+.person-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.rule-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  background: var(--hover);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rule-chip svg {
+  flex: none;
+}
+.rule-chip.everyone {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--text);
+}
+.rule-chip.policy {
+  font-style: italic;
+}
+.person-chips {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.person-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 9px 0 4px;
+  border-radius: 13px;
+  border: 1px solid var(--border-strong);
+  font-size: 12.5px;
+}
+.person-chip span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.person-chip .avatar {
+  flex: none;
+}
+.person-chip:hover {
+  background: var(--hover);
+}
+
+/* App access: people × apps */
+.access-table th.access-col,
+.access-table td.access-cell {
+  width: 64px;
+  min-width: 64px;
+  max-width: 88px;
+  padding: 6px 4px;
+  text-align: center;
+}
+.access-table th.access-col {
+  height: auto;
+  vertical-align: bottom;
+}
+.access-col-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 2px;
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+}
+.access-col-head span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+.access-col-head:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.access-table .selected.access-col,
+.access-table .selected.access-cell {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.access-cell svg {
+  color: var(--primary);
+  vertical-align: middle;
+}
+.access-table .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 180px;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+.access-table th.sticky-col {
+  background: var(--bg-subtle);
+}
+
+/* App access: the people in the side panel */
+.access-people {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.access-person {
+  display: block;
+  width: 100%;
+  margin: 0 -6px;
+  padding: 6px;
+  border-radius: 7px;
+  text-align: left;
+  box-sizing: content-box;
+}
+.access-person:hover {
+  background: var(--hover);
+}
+.access-person .user-cell-sub {
+  white-space: normal;
+}
+
 /* Event log */
 .event-list {
   display: flex;

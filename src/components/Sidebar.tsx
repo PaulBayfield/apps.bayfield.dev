@@ -4,7 +4,7 @@ import { byCategory, useApp } from "../lib/app";
 import { recordOpened, useRecent } from "../lib/local";
 import { useSettings } from "../lib/settings";
 import { AppIcon } from "./AppIcon";
-import { BarChart, Clock, Folder, Gear, LayoutGrid, PanelLeft, Search, Table, Users } from "./icons";
+import { BarChart, Clock, Folder, Gear, LayoutGrid, PanelLeft, Search, ShieldCheck, Table, Users } from "./icons";
 
 const MIN_W = 200;
 const MAX_W = 480;
@@ -53,6 +53,7 @@ export function Sidebar({ favorites }: { favorites: App[] }) {
               [
                 ["overview", "adminOverview", <BarChart key="o" />],
                 ["users", "adminUsers", <Users key="u" />],
+                ["access", "adminAccess", <ShieldCheck key="p" />],
                 ["activity", "adminActivity", <Table key="a" />],
               ] as const
             ).map(([tab, label, icon]) => (

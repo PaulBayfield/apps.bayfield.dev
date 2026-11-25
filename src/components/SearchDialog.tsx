@@ -8,7 +8,7 @@ import { useSettings } from "../lib/settings";
 import type { StringKey } from "../lib/i18n";
 import { AppIcon } from "./AppIcon";
 import { matches } from "./AppsPage";
-import { BarChart, Clock, Folder, Gear, LayoutGrid, Search, Table, Users } from "./icons";
+import { BarChart, Clock, Folder, Gear, LayoutGrid, Search, ShieldCheck, Table, Users } from "./icons";
 
 interface Result {
   key: string;
@@ -44,6 +44,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
         ? ([
             ["adminOverview", <BarChart size={16} />, () => navigate({ name: "admin", tab: "overview" })],
             ["adminUsers", <Users size={16} />, () => navigate({ name: "admin", tab: "users" })],
+            ["adminAccess", <ShieldCheck size={16} />, () => navigate({ name: "admin", tab: "access" })],
             ["adminActivity", <Table size={16} />, () => navigate({ name: "admin", tab: "activity" })],
           ] as [StringKey, ReactNode, () => void][])
         : []),

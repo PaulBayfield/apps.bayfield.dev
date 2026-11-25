@@ -7,7 +7,7 @@
 import { Hono, type Context, type Next } from "hono";
 import { authentik } from "./config.ts";
 import { type AppEnv } from "./auth.ts";
-import { appsFor, call, canAdmin, devicesFor, toUser, type AkDevice, type AkUser, type RawUser } from "./authentik.ts";
+import { allGroups, appsFor, bindingsOf, call, canAdmin, devicesFor, groupReach, iconUrl, toUser, type AkDevice, type AkUser, type RawBinding, type RawUser } from "./authentik.ts";
 import { HttpError, isTimeZone, rateLimit } from "./http.ts";
 
 const CACHE_MS = 2 * 60_000;
@@ -439,6 +439,171 @@ async function appIcons(): Promise<Map<string, string>> {
   return icons;
 }
 
+// --- Who can open each app ---
+//
+// For every active person, Authentik's own policy check (the `for_user` filter, the same one the
+// launcher uses) says which applications they may open; turned around, that's the list of people
+// per app. The bindings then say why: the bound groups (directly or through a child group), a
+// binding naming the user, or a policy whose verdict only Authentik knows.
+
+export type AccessWarning = "access" | "rules";
+
+export interface AccessGrant {
+  pk: number;
+  /** The bound groups that let them in; `via`: their own group, when the bound one is its ancestor. */
+  groups: { name: string; via: string | null }[];
+  /** A binding names this user. */
+  direct: boolean;
+}
+
+export interface AccessApp {
+  slug: string;
+  name: string;
+  icon: string | null;
+  url: string | null;
+  category: string;
+  /** "any" (one binding is enough) or "all" (each must pass). */
+  mode: "any" | "all";
+  /** The app's bindings, or null when they couldn't be read. */
+  rules: { everyone: boolean; groups: string[]; users: number[]; policies: string[] } | null;
+  /** Who can open it, or null when that couldn't be worked out. */
+  users: AccessGrant[] | null;
+}
+
+interface RawAppFull {
+  pk: string;
+  slug: string;
+  name: string;
+  launch_url?: string | null;
+  meta_launch_url?: string;
+  meta_icon?: string | null;
+  meta_icon_url?: string | null;
+  group?: string;
+  policy_engine_mode?: string;
+}
+
+let accessCache: { data: Awaited<ReturnType<typeof computeAccess>>; until: number } | null = null;
+const slugCache = new Map<number, { slugs: Set<string>; until: number }>();
+
+/** Every application in Authentik (with or without a launch URL). */
+async function everyApp(): Promise<RawAppFull[]> {
+  const out: RawAppFull[] = [];
+  for (let page = 1; page && page <= 50; ) {
+    const q = new URLSearchParams({ superuser_full_list: "true", ordering: "name", page_size: "200", page: String(page) });
+    const res = await call<{ pagination: { next: number }; results: RawAppFull[] }>(`/core/applications/?${q}`);
+    out.push(...res.results);
+    page = res.pagination?.next ?? 0;
+  }
+  return out;
+}
+
+/** The slugs of every application `pk` may open, as Authentik's policy engine decides. */
+async function slugsFor(pk: number, fresh: boolean): Promise<Set<string>> {
+  const hit = slugCache.get(pk);
+  if (!fresh && hit && hit.until > Date.now()) return hit.slugs;
+  const slugs = new Set<string>();
+  // Filtered by policy after paginating, so pages can come back short: follow `next`.
+  for (let page = 1; page && page <= 50; ) {
+    const q = new URLSearchParams({ for_user: String(pk), page_size: "200", page: String(page) });
+    const res = await call<{ pagination: { next: number }; results: { slug: string }[] }>(`/core/applications/?${q}`);
+    for (const a of res.results) slugs.add(a.slug);
+    page = res.pagination?.next ?? 0;
+  }
+  slugCache.set(pk, { slugs, until: Date.now() + CACHE_MS });
+  return slugs;
+}
+
+async function computeAccess(fresh: boolean) {
+  const warnings: AccessWarning[] = [];
+  const users = await allUsers(fresh);
+  const people = users.filter((u) => u.kind === "person" && u.isActive);
+  if (!authentik) return devAccess(people);
+
+  const [rawApps, groups] = await Promise.all([everyApp(), allGroups().catch(() => null)]);
+
+  // Each person's apps, six at a time.
+  const access = new Map<number, Set<string>>();
+  let failed = false;
+  const todo = [...people];
+  const worker = async () => {
+    for (let u = todo.shift(); u && !failed; u = todo.shift()) {
+      try {
+        access.set(u.pk, await slugsFor(u.pk, fresh));
+      } catch (e) {
+        console.warn("Admin: couldn't read a user's apps:", e);
+        failed = true;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  if (failed) warnings.push("access");
+
+  const bindings = new Map<string, RawBinding[]>();
+  if (groups) {
+    try {
+      await Promise.all(rawApps.map(async (a) => bindings.set(a.slug, (await bindingsOf(String(a.pk))).filter((b) => b.enabled !== false))));
+    } catch (e) {
+      console.warn("Admin: couldn't read policy bindings:", e);
+      bindings.clear();
+    }
+  }
+  if (!groups || bindings.size < rawApps.length) warnings.push("rules");
+  const reach = new Map(people.map((u) => [u.pk, groups ? groupReach(u.groupIds, groups) : new Map<string, string | null>()]));
+
+  const apps: AccessApp[] = rawApps.map((a) => {
+    const url = a.launch_url || a.meta_launch_url || "";
+    const bound = bindings.get(a.slug);
+    const allowing = bound?.filter((b) => !b.negate) ?? [];
+    const groupName = (pk: string) => groups?.get(pk)?.name ?? "?";
+    return {
+      slug: a.slug,
+      name: a.name,
+      icon: iconUrl(a.meta_icon_url ?? a.meta_icon),
+      url: /^https?:\/\//.test(url) ? url : null,
+      category: a.group ?? "",
+      mode: a.policy_engine_mode === "all" ? "all" : "any",
+      rules: bound
+        ? {
+            everyone: bound.length === 0,
+            groups: [...new Set(allowing.filter((b) => b.group).map((b) => groupName(String(b.group))))].sort((x, y) => x.localeCompare(y)),
+            users: [...new Set(allowing.filter((b) => typeof b.user === "number").map((b) => b.user!))],
+            policies: [...new Set(allowing.filter((b) => b.policy).map((b) => b.policy_obj?.name ?? "?"))],
+          }
+        : null,
+      users: failed
+        ? null
+        : people
+            .filter((u) => access.get(u.pk)?.has(a.slug))
+            .map((u) => {
+              const r = reach.get(u.pk)!;
+              const seen = new Set<string>();
+              const via: AccessGrant["groups"] = [];
+              for (const b of allowing) {
+                const g = b.group ? String(b.group) : null;
+                if (!g || !r.has(g) || seen.has(g)) continue;
+                seen.add(g);
+                via.push({ name: groupName(g), via: r.get(g) ?? null });
+              }
+              return { pk: u.pk, groups: via, direct: allowing.some((b) => b.user === u.pk) };
+            }),
+    };
+  });
+  return { warnings, apps, users: people };
+}
+
+async function accessOverview(fresh: boolean) {
+  if (fresh || !accessCache || accessCache.until <= Date.now()) accessCache = { data: await computeAccess(fresh), until: Date.now() + CACHE_MS };
+  const { warnings, apps, users } = accessCache.data;
+  return {
+    generatedAt: new Date(accessCache.until - CACHE_MS).toISOString(),
+    warnings,
+    apps,
+    /** The active people, for the names and avatars behind the pks above. */
+    users: users.map((u) => ({ pk: u.pk, username: u.username, name: u.name, email: u.email, avatar: u.avatar, isSuperuser: u.isSuperuser, groups: u.groups })),
+    adminUrl: authentik ? `${authentik.url}/if/admin/#/core/applications` : null,
+  };
+}
+
 // --- Routes ---
 
 async function requireAdmin(c: Context<AppEnv>, next: Next) {
@@ -477,6 +642,12 @@ admin.get("/users/:pk", async (c) => {
   return c.json(await userDetail(pk, days, tz, fresh));
 });
 
+/** Every application and the active people who can open it (with what lets them in). ?refresh=1 skips the caches. */
+admin.get("/access", async (c) => {
+  const { fresh } = params(c);
+  return c.json(await accessOverview(fresh));
+});
+
 /** The latest events, newest first: ?kind=login|failed|app, ?q= matches the user, app, IP or place. */
 admin.get("/events", async (c) => {
   const { days, fresh } = params(c);
@@ -491,6 +662,37 @@ admin.get("/events", async (c) => {
 });
 
 // --- Local development stand-in (DEV_LOGIN_USER): a made-up organisation ---
+
+/** Who can open what in the made-up organisation, from the groups devData() gives people. */
+function devAccess(people: AdminUser[]) {
+  const apps: { slug: string; name: string; url: string | null; category: string; groups: string[]; users?: number[]; policies?: string[]; mode?: "any" | "all" }[] = [
+    { slug: "notes", name: "Notes", url: "https://notes.bayfield.dev", category: "Productivity", groups: ["Family", "Developers"] },
+    { slug: "calendar", name: "Calendar", url: "https://calendar.bayfield.dev", category: "Productivity", groups: ["Family"], users: [9] },
+    { slug: "devtime", name: "DevTime", url: "https://dev.bayfield.dev", category: "Development", groups: ["Developers"], users: [2] },
+    { slug: "music", name: "Music", url: "https://music.bayfield.dev", category: "Media", groups: [] },
+    { slug: "internal", name: "Internal", url: "https://internal.bayfield.dev", category: "Administration", groups: ["Admins"], policies: ["Office network only"], mode: "all" },
+    { slug: "apps-proxy", name: "Proxy outpost", url: null, category: "", groups: ["Admins"] },
+  ];
+  return {
+    warnings: [] as AccessWarning[],
+    users: people,
+    apps: apps.map((a): AccessApp => {
+      const everyone = !a.groups.length && !a.users?.length && !a.policies?.length;
+      return {
+        slug: a.slug,
+        name: a.name,
+        icon: null,
+        url: a.url,
+        category: a.category,
+        mode: a.mode ?? "any",
+        rules: { everyone, groups: a.groups, users: a.users ?? [], policies: a.policies ?? [] },
+        users: people
+          .map((u) => ({ pk: u.pk, groups: u.groups.filter((g) => a.groups.includes(g)).map((name) => ({ name, via: null })), direct: !!a.users?.includes(u.pk) }))
+          .filter((g) => everyone || g.groups.length > 0 || g.direct),
+      };
+    }),
+  };
+}
 
 let dev: { users: AdminUser[]; events: UsageEvent[]; mfa: Map<number, MfaSummary>; devices: (pk: number) => AkDevice[] } | null = null;
 
